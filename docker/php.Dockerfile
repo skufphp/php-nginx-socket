@@ -1,0 +1,45 @@
+FROM php:8.4-fpm-alpine
+
+# Установка необходимых пакетов и PHP-расширений для PostgreSQL и общих библиотек
+RUN apk add --no-cache \
+    curl \
+    $PHPIZE_DEPS \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    git \
+    oniguruma-dev \
+    libzip-dev \
+    linux-headers \
+    fcgi \
+    postgresql-dev \
+    && pecl channel-update pecl.php.net \
+    && pecl install xdebug \
+    && docker-php-ext-enable xdebug \
+    && docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    pgsql \
+    mbstring \
+    xml \
+    gd \
+    bcmath \
+    zip \
+    && apk del $PHPIZE_DEPS
+
+# Удаляем стандартные примеры конфигураций, чтобы не мешали кастомным
+RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf
+
+# Гарантируем существование директории под Unix-сокеты
+RUN mkdir -p /var/run/php && chown -R www-data:www-data /var/run/php
+
+# Устанавливаем Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Устанавливаем рабочую директорию
+WORKDIR /var/www/html
+
+CMD ["php-fpm", "-F"]

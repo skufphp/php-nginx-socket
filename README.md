@@ -7,31 +7,31 @@
 ## Что внутри (архитектура)
 
 Сервисы docker-compose.yml:
-- PHP-FPM 8.4 — выполняет PHP, слушает Unix-сокет /var/run/php/php-fpm.sock, Xdebug установлен и управляется через переменные окружения.
-- Nginx — отдаёт статику и проксирует .php в PHP-FPM через Unix-сокет (fastcgi_pass unix:/var/run/php/php-fpm.sock); доступен на http://localhost:80.
-- PostgreSQL — СУБД на localhost:5432, данные в именованном томе postgres-data.
+- PHP-FPM 8.4 — выполняет PHP, слушает Unix-сокет /var/run/php/php-fpm.sock; Xdebug установлен и может включаться через переменные окружения.
+- Nginx — отдаёт статику и проксирует .php в PHP-FPM через Unix-сокет (fastcgi_pass unix:/var/run/php/php-fpm.sock); доступен на http://localhost.
+- PostgreSQL 17 — СУБД на localhost:5432, данные в именованном томе postgres_data.
 - pgAdmin 4 — веб-интерфейс PostgreSQL на http://localhost:8080.
 
 Здоровье (healthchecks):
-- PHP-FPM — проверка наличия сокета и/или FastCGI-ответа через сокет.
-- Nginx — HTTP-запрос к http://localhost/.
+- PHP-FPM — проверка конфигурации php-fpm -t.
+- Nginx — проверка конфигурации nginx -t.
 - PostgreSQL — pg_isready.
-- pgAdmin — HTTP-запрос к http://localhost:8080/.
+- pgAdmin — HTTP-запрос к локальному http://localhost:80/ внутри контейнера pgAdmin.
 
 Порядок старта: Nginx ожидает, когда PHP-FPM станет healthy.
 
 ## Структура репозитория (актуальная)
 ```
-php-nginx-unix/
+php-nginx-socket/
 ├── Makefile
 ├── README.md
 ├── config/
 │   ├── nginx/
-│   │   └── nginx.conf          # Конфиг Nginx (fastcgi_pass unix:/var/run/php/php-fpm.sock)
+│   │   └── conf.d/
+│   │       └── default.conf    # Основной server-блок: fastcgi_pass unix:/var/run/php/php-fpm.sock
 │   └── php/
 │       ├── php.ini             # Dev-настройки + Xdebug через env
-│       └── pool.d/
-│           └── www.conf        # PHP-FPM pool: listen=/var/run/php/php-fpm.sock и права на сокет
+│       └── www.conf            # PHP-FPM pool: listen=/var/run/php/php-fpm.sock и права на сокет
 ├── docker/
 │   └── php.Dockerfile          # Образ PHP-FPM 8.4 (Alpine) + расширения + Xdebug + Composer
 ├── docker-compose.yml          # Основной стек: PHP-FPM (Unix-сокет), Nginx, PostgreSQL, pgAdmin
@@ -83,13 +83,13 @@ PHP (config/php/php.ini):
 - opcache включён; validate_timestamps=1 (код подхватывается сразу)
 - Xdebug управляется через переменные окружения (см. раздел ниже)
 
-PHP-FPM (config/php/pool.d/www.conf):
+PHP-FPM (config/php/www.conf):
 - listen = /var/run/php/php-fpm.sock
-- listen.owner = www-data; listen.group = www-data; listen.mode = 0660
+- listen.owner = www-data; listen.group = www-data; listen.mode = 0666 (для удобства в dev)
 - pm = dynamic (значения по умолчанию подходят для dev)
-- Убедитесь, что /var/run/php существует в контейнере и смонтирован из именованного тома
+- Убедитесь, что /var/run/php существует в контейнере и смонтирован из общего тома
 
-Nginx (config/nginx/nginx.conf):
+Nginx (config/nginx/conf.d/default.conf):
 - Отдаёт статику из /var/www/html
 - Проксирует .php через Unix-сокет: fastcgi_pass unix:/var/run/php/php-fpm.sock
 - index включает index.php
