@@ -24,7 +24,9 @@ services:
 
   # Веб-сервер Nginx
   nginx-socket:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
     container_name: nginx-socket
     restart: unless-stopped
     ports:
